@@ -688,6 +688,40 @@
       return JSON.stringify(value, null, spacing);
     }
 
+    const DATEISH_KEY_REGEX = /(date|time|timestamp|updated|created|modified|deleted|expires|expiry|_at)$/i;
+
+    function isDateishKey(key) {
+      return typeof key === "string" && DATEISH_KEY_REGEX.test(key);
+    }
+
+    function epochMsFromValue(value, key) {
+      if (typeof value !== "number" || !Number.isFinite(value)) return null;
+      if (!isDateishKey(key)) return null;
+      const abs = Math.abs(value);
+      const msMin = 946684800000; // 2000-01-01
+      const msMax = 4102444800000; // 2100-01-01
+      if (abs >= msMin && abs <= msMax) return value;
+      const sMin = 946684800; // 2000-01-01
+      const sMax = 4102444800; // 2100-01-01
+      if (abs >= sMin && abs <= sMax) return value * 1000;
+      return null;
+    }
+
+    function formatEpochMs(epochMs) {
+      try {
+        return new Date(epochMs).toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        });
+      } catch {
+        return null;
+      }
+    }
+
     function cloneSorted(value) {
       const type = getType(value);
       if (type === "array") return value.map(cloneSorted);
@@ -700,16 +734,24 @@
       return value;
     }
 
-    function valuePreview(value, type) {
-      if (type === "object") return `{${Object.keys(value).length} keys}`;
+    function valuePreview(value, type, key = null) {
+      if (type === "object") return "{…}";
       if (type === "array") {
         const preview = value.slice(0, 3).map((item) => {
           const itemType = getType(item);
           return itemType === "object" ? "{…}" : itemType === "array" ? "[…]" : JSON.stringify(item);
         }).join(", ");
-        return `[${value.length} items${preview ? `: ${truncate(preview, 42)}` : ""}]`;
+        if (!value.length) return "[]";
+        return preview ? `[${truncate(preview, 42)}]` : "[…]";
       }
       if (type === "string") return `"${truncate(value, 120)}"`;
+      if (type === "number") {
+        const epochMs = epochMsFromValue(value, key);
+        if (epochMs !== null) {
+          const formatted = formatEpochMs(epochMs);
+          if (formatted) return `${value} (${formatted})`;
+        }
+      }
       return JSON.stringify(value);
     }
 
@@ -726,6 +768,7 @@
         } catch {}
       }
       if (typeof key === "string" && /(^(id|uuid)$|Id$|ID$|_id$)/.test(key)) detections.push("Likely ID");
+      if (epochMsFromValue(value, key) !== null) detections.push("Date-like");
       return detections;
     }
 
@@ -863,7 +906,7 @@
           key,
           type,
           value,
-          valuePreview: valuePreview(value, type),
+          valuePreview: valuePreview(value, type, key),
           childCount: type === "object" ? Object.keys(value).length : type === "array" ? value.length : 0,
           siblingCount,
           detections,
@@ -1213,7 +1256,7 @@
       if (meta.depth < minDepth || meta.depth > maxDepth) return false;
 
       const keyText = meta.key === null || typeof meta.key === "number" ? String(meta.key ?? "root") : meta.key;
-      const valueText = type === "object" || type === "array" ? meta.valuePreview : String(meta.value);
+      const valueText = type === "object" || type === "array" || type === "number" ? meta.valuePreview : String(meta.value);
       if (!matcher) return state.search.type !== "all" || state.search.depthMin !== "" || state.search.depthMax !== "";
 
       if (state.search.mode === "key") return matchesQuery(keyText, matcher) || matchesQuery(meta.path, matcher);
@@ -1323,6 +1366,9 @@
         const preview = meta.type === "string"
           ? `"${escapeHtml(truncate(meta.value, 160))}"`
           : escapeHtml(meta.valuePreview);
+        const childBadge = (meta.type === "object" || meta.type === "array")
+          ? `<span class="badge bg-slate-900/5 text-slate-700 dark:bg-slate-50/10 dark:text-slate-200">${meta.childCount} ${meta.type === "object" ? "keys" : "items"}</span>`
+          : "";
         const actions = `
           <div class="tree-actions ml-auto flex items-center gap-1 text-slate-600 dark:text-slate-300">
             <button class="tree-action-btn rounded-xl px-2 py-1 text-xs" title="Copy path" data-copy-path="${escapeHtml(path)}">Copy path</button>
@@ -1357,7 +1403,8 @@
                   <span class="type-muted">${meta.depth === 0 ? "" : ":"}</span>
                   <span class="${valueClass} min-w-0 truncate">${preview}</span>
                   <span class="badge ${badgeClasses[meta.type]}">${meta.type}</span>
-                  ${meta.detections.slice(0, 2).map((item) => `<span class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">${escapeHtml(item)}</span>`).join("")}
+                  ${childBadge}
+                  ${meta.detections.slice(0, 2).map((item) => `<span class="badge bg-slate-900/5 text-slate-700 dark:bg-slate-50/10 dark:text-slate-200">${escapeHtml(item)}</span>`).join("")}
                 </div>
                 ${actions}
               </div>
@@ -1561,9 +1608,11 @@
       const type = meta.type;
       const parentMeta = meta.parentPath ? getMeta(meta.parentPath) : null;
       const detectorBadges = meta.detections.length
-        ? meta.detections.map((item) => `<span class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">${escapeHtml(item)}</span>`).join("")
+        ? meta.detections.map((item) => `<span class="badge bg-slate-900/5 text-slate-700 dark:bg-slate-50/10 dark:text-slate-200">${escapeHtml(item)}</span>`).join("")
         : `<span class="text-xs text-slate-500 dark:text-slate-400">No special pattern detected.</span>`;
       const rawValue = type === "object" || type === "array" ? safeJsonString(value, 2) : JSON.stringify(value);
+      const epochMs = type === "number" ? epochMsFromValue(value, meta.key) : null;
+      const epochLabel = epochMs !== null ? formatEpochMs(epochMs) : null;
       let embeddedAction = "";
       if (type === "string") {
         try {
@@ -1623,7 +1672,7 @@
             </div>
             <pre class="code-block max-h-[280px] overflow-auto rounded-2xl bg-slate-900/90 p-3 text-xs text-slate-100">${escapeHtml(rawValue)}</pre>
             ${type === "string" ? `<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">String length: ${value.length}</p>` : ""}
-            ${type === "number" ? `<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Numeric value: ${value}</p>` : ""}
+            ${type === "number" ? `<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Numeric value: ${value}${epochLabel ? ` · ${escapeHtml(epochLabel)}` : ""}</p>` : ""}
           </div>
         </div>
       `;
