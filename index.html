@@ -1,0 +1,2085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>prettierJson</title>
+  <script>
+    (function () {
+      const themeKey = "jsonformatter.theme";
+      const saved = localStorage.getItem(themeKey);
+      const theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      if (theme === "dark") document.documentElement.classList.add("dark");
+    })();
+
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: "#020617"
+            }
+          },
+          boxShadow: {
+            glow: "0 10px 40px rgba(59,130,246,0.18)"
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg-a: 248 250 252;
+      --bg-b: 241 245 249;
+      --panel: 255 255 255 / 0.72;
+      --panel-strong: 255 255 255 / 0.86;
+      --panel-border: 148 163 184 / 0.18;
+      --text-main: 15 23 42;
+      --text-soft: 51 65 85;
+      --accent: 14 165 233;        /* sky-500 */
+      --accent-soft: 56 189 248;   /* sky-400 */
+      --success: 16 185 129;
+      --danger: 244 63 94;
+      --string: 16 185 129;        /* emerald-500 */
+      --number: 99 102 241;        /* indigo-500 */
+      --boolean: 245 158 11;       /* amber-500 */
+      --null: 244 63 94;           /* rose-500 */
+      --key: 15 23 42;             /* near-black */
+      --shadow-color: 15 23 42 / 0.08;
+      --guide: 148 163 184 / 0.18;
+      --glass-blur: 14px;
+      --glass-sat: 1.12;
+      --ring: 14 165 233;
+    }
+
+    html.dark {
+      --bg-a: 2 6 23;
+      --bg-b: 15 23 42;
+      --panel: 15 23 42 / 0.62;
+      --panel-strong: 15 23 42 / 0.78;
+      --panel-border: 148 163 184 / 0.16;
+      --text-main: 226 232 240;
+      --text-soft: 148 163 184;
+      --accent: 56 189 248;
+      --accent-soft: 14 165 233;
+      --success: 52 211 153;
+      --danger: 251 113 133;
+      --string: 45 212 191;
+      --number: 196 181 253;
+      --boolean: 251 146 60;
+      --null: 251 113 133;
+      --key: 147 197 253;
+      --shadow-color: 2 6 23 / 0.4;
+      --guide: 148 163 184 / 0.12;
+      --glass-blur: 14px;
+      --glass-sat: 1.05;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgb(var(--accent-soft) / 0.12), transparent 34%),
+        radial-gradient(circle at top right, rgb(16 185 129 / 0.08), transparent 34%),
+        linear-gradient(145deg, rgb(var(--bg-a)), rgb(var(--bg-b)));
+      color: rgb(var(--text-main));
+      min-height: 100vh;
+    }
+
+    .glass {
+      background: rgb(var(--panel));
+      border: 1px solid rgb(var(--panel-border));
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+      box-shadow: 0 20px 40px rgb(var(--shadow-color));
+    }
+
+    .glass-strong {
+      background: rgb(var(--panel-strong));
+      border: 1px solid rgb(var(--panel-border));
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+      box-shadow: 0 20px 40px rgb(var(--shadow-color));
+    }
+
+    .ui-btn {
+      border: 1px solid rgb(var(--panel-border));
+      background: rgb(var(--panel));
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+      transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+    .ui-btn:hover {
+      background: rgb(var(--panel-strong));
+      border-color: rgb(var(--ring) / 0.35);
+      box-shadow: 0 10px 22px rgb(var(--shadow-color));
+    }
+    .ui-btn:active { transform: translateY(0); }
+
+    .ui-input,
+    .ui-select,
+    .ui-textarea {
+      background: rgb(255 255 255 / 0.55);
+      border: 1px solid rgb(var(--panel-border));
+      outline: none;
+      transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    }
+    html.dark .ui-input,
+    html.dark .ui-select,
+    html.dark .ui-textarea {
+      background: rgb(2 6 23 / 0.35);
+    }
+    .ui-input:focus,
+    .ui-select:focus,
+    .ui-textarea:focus {
+      border-color: rgb(var(--ring) / 0.55);
+      box-shadow: 0 0 0 4px rgb(var(--ring) / 0.16);
+      background: rgb(255 255 255 / 0.68);
+    }
+    html.dark .ui-input:focus,
+    html.dark .ui-select:focus,
+    html.dark .ui-textarea:focus {
+      background: rgb(2 6 23 / 0.45);
+    }
+
+    .tree-row::before {
+      content: "";
+      position: absolute;
+      left: calc(var(--indent) - 10px);
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgb(var(--guide));
+      opacity: var(--guide-opacity, 0);
+    }
+
+    .tree-row[data-depth="0"]::before {
+      display: none;
+    }
+
+    .tree-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .tree-actions {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+
+    .tree-row:hover .tree-actions,
+    .tree-row.is-selected .tree-actions,
+    .tree-row.is-match .tree-actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .code-block {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.84rem;
+      line-height: 1.6;
+    }
+
+    .type-string { color: rgb(var(--string)); }
+    .type-number { color: rgb(var(--number)); }
+    .type-boolean { color: rgb(var(--boolean)); }
+    .type-null { color: rgb(var(--null)); }
+    .type-key { color: rgb(var(--key)); }
+    .type-muted { color: rgb(var(--text-soft)); }
+
+    .line-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0;
+    }
+
+    .line-no {
+      text-align: right;
+      padding-right: 1rem;
+      user-select: none;
+      color: rgb(var(--text-soft) / 0.95);
+      border-right: 1px solid rgb(var(--panel-border));
+      min-width: 3.5rem;
+    }
+
+    .line-content {
+      padding-left: 1rem;
+      min-width: 0;
+      white-space: pre;
+      overflow-wrap: normal;
+    }
+
+    .wrap-enabled .line-content {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      border-radius: 999px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.72rem;
+      line-height: 1;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .metric-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -30% -35% auto;
+      width: 7rem;
+      height: 7rem;
+      background: radial-gradient(circle, rgb(var(--accent) / 0.18), transparent 65%);
+      pointer-events: none;
+    }
+
+    textarea::-webkit-scrollbar,
+    .scroll-area::-webkit-scrollbar,
+    pre::-webkit-scrollbar,
+    select::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    textarea::-webkit-scrollbar-thumb,
+    .scroll-area::-webkit-scrollbar-thumb,
+    pre::-webkit-scrollbar-thumb,
+    select::-webkit-scrollbar-thumb {
+      background: rgb(var(--text-soft) / 0.4);
+      border-radius: 999px;
+      border: 3px solid transparent;
+      background-clip: padding-box;
+    }
+
+    .toast-enter {
+      animation: toast-in 0.2s ease forwards;
+    }
+
+    .tree-row {
+      border: 1px solid rgb(var(--panel-border));
+      background: rgb(255 255 255 / 0.55);
+    }
+    html.dark .tree-row {
+      background: rgb(2 6 23 / 0.22);
+      border-color: rgb(148 163 184 / 0.14);
+    }
+    .tree-row:hover {
+      border-color: rgb(var(--ring) / 0.28);
+      background: rgb(255 255 255 / 0.72);
+    }
+    html.dark .tree-row:hover {
+      background: rgb(2 6 23 / 0.30);
+    }
+    .tree-row.is-selected {
+      border-color: rgb(var(--ring) / 0.55);
+      background: rgb(var(--ring) / 0.09);
+    }
+    .tree-row.is-match:not(.is-selected) {
+      border-color: rgb(16 185 129 / 0.22);
+      background: rgb(16 185 129 / 0.06);
+    }
+    .tree-row.is-active-match:not(.is-selected) {
+      background: rgb(245 158 11 / 0.10);
+      border-color: rgb(245 158 11 / 0.28);
+    }
+
+    .tree-toggle, .tree-action-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+    }
+    .tree-toggle:hover, .tree-action-btn:hover {
+      background: rgb(255 255 255 / 0.55);
+      border-color: rgb(var(--panel-border));
+    }
+    html.dark .tree-toggle:hover, html.dark .tree-action-btn:hover {
+      background: rgb(148 163 184 / 0.10);
+      border-color: rgb(148 163 184 / 0.18);
+    }
+
+    html:not(.dark) body { color: rgb(15 23 42); }
+
+    html:not(.dark) textarea::placeholder,
+    html:not(.dark) input::placeholder {
+      color: rgb(71 85 105);
+    }
+
+    html:not(.dark) .line-no {
+      color: rgb(71 85 105);
+      border-right-color: rgb(203 213 225);
+    }
+
+    html:not(.dark) .tree-row.is-selected {
+      background: rgb(59 130 246 / 0.14) !important;
+    }
+
+    html:not(.dark) .tree-row.is-match {
+      background: rgb(14 165 233 / 0.08);
+    }
+
+    html { color-scheme: light; }
+    html.dark { color-scheme: dark; }
+
+    /* Workaround: if Tailwind CDN darkMode falls back to media, undo dark:* utilities when `.dark` is not set. */
+    html:not(.dark) .dark\:bg-slate-950\/30 { background-color: rgb(255 255 255 / 0.65) !important; }
+    html:not(.dark) .dark\:bg-slate-950\/40 { background-color: rgb(255 255 255 / 0.75) !important; }
+    html:not(.dark) .dark\:bg-slate-950\/60 { background-color: rgb(255 255 255 / 0.85) !important; }
+    html:not(.dark) .dark\:bg-slate-950\/95 { background-color: rgb(255 255 255 / 0.98) !important; }
+    html:not(.dark) .dark\:bg-slate-900\/60 { background-color: rgb(255 255 255 / 0.85) !important; }
+    html:not(.dark) .dark\:bg-slate-900\/70 { background-color: rgb(255 255 255 / 0.9) !important; }
+    html:not(.dark) .dark\:bg-slate-900\/80 { background-color: rgb(248 250 252 / 0.95) !important; }
+    html:not(.dark) .dark\:bg-slate-900\/90 { background-color: rgb(248 250 252 / 0.98) !important; }
+    html:not(.dark) .dark\:bg-white\/10 { background-color: rgb(255 255 255) !important; }
+
+    html:not(.dark) .dark\:border-slate-700 { border-color: rgb(203 213 225 / 0.95) !important; }
+    html:not(.dark) .dark\:border-slate-800 { border-color: rgb(203 213 225 / 0.95) !important; }
+    html:not(.dark) .dark\:border-blue-500\/30 { border-color: rgb(147 197 253 / 0.8) !important; }
+
+    html:not(.dark) .dark\:text-slate-100 { color: rgb(15 23 42) !important; }
+    html:not(.dark) .dark\:text-slate-200 { color: rgb(30 41 59) !important; }
+    html:not(.dark) .dark\:text-slate-300 { color: rgb(51 65 85) !important; }
+    html:not(.dark) .dark\:text-slate-400 { color: rgb(71 85 105) !important; }
+    html:not(.dark) .dark\:text-blue-300 { color: rgb(37 99 235) !important; }
+
+    html:not(.dark) .dark\:hover\:bg-slate-900:hover { background-color: rgb(241 245 249) !important; }
+    html:not(.dark) .dark\:hover\:bg-white\/15:hover { background-color: rgb(241 245 249) !important; }
+
+    @keyframes toast-in {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="text-slate-900 dark:text-slate-100 selection:bg-blue-500/30">
+  <div class="mx-auto max-w-[1700px] px-4 pb-8 pt-5 sm:px-6 lg:px-8">
+    <header class="glass sticky top-4 z-30 mb-5 rounded-3xl px-4 py-4 sm:px-5">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div class="flex min-w-0 flex-col gap-3">
+          <div>
+            <div class="flex flex-wrap items-center gap-3">
+              <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">prettierJson</h1>
+              <span id="validityBadge" class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">Idle</span>
+            </div>
+            <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">Format, inspect, search, validate, and understand JSON with a developer-grade explorer.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3 xl:items-end">
+          <div class="flex flex-wrap gap-2">
+            <button id="themeToggle" class="ui-btn rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">🌙 Theme</button>
+            <label class="ui-btn cursor-pointer rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <input id="fileInput" type="file" accept=".json,application/json" class="hidden" />
+              Import file
+            </label>
+            <button id="editBtn" class="ui-btn hidden rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">Edit JSON</button>
+            <button id="clearBtn" class="ui-btn rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">Clear</button>
+            <button id="validateBtn" class="rounded-2xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400">Validate</button>
+            <button id="prettifyBtn" class="rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110">Prettify</button>
+            <button id="minifyBtn" class="rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 dark:from-slate-600 dark:to-slate-900">Minify</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+            <label class="inline-flex items-center gap-2 rounded-full border border-slate-300/60 px-3 py-1.5 dark:border-slate-700">
+              <input id="autoParseToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" checked />
+              Auto-parse
+            </label>
+            <label class="inline-flex items-center gap-2 rounded-full border border-slate-300/60 px-3 py-1.5 dark:border-slate-700">
+              <input id="sortKeysToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" />
+              Sort keys view
+            </label>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="mainGrid" class="grid gap-5">
+      <section id="editorSection" class="mx-auto w-full max-w-4xl">
+        <div class="glass-strong rounded-3xl p-4 sm:p-5">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold">Input editor</h2>
+              <p class="text-sm text-slate-700 dark:text-slate-300">Paste JSON, drop a file, or load a sample. Input saves locally.</p>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+              <span id="inputMeta">0 chars</span>
+              <span class="opacity-40">•</span>
+              <span>⌘/Ctrl + Enter to parse</span>
+            </div>
+          </div>
+
+          <div id="dropZone" class="relative overflow-hidden rounded-2xl border border-dashed border-slate-300/70 bg-white/50 transition dark:border-slate-700 dark:bg-slate-950/40">
+            <textarea id="jsonInput" spellcheck="false" class="ui-textarea code-block h-[620px] w-full resize-none bg-transparent px-4 py-4 text-slate-900 placeholder:text-slate-400 dark:text-slate-100" placeholder='Paste JSON here, e.g. { "hello": "world" }'></textarea>
+            <div id="dropOverlay" class="pointer-events-none absolute inset-0 hidden items-center justify-center bg-blue-500/10 backdrop-blur-sm">
+              <div class="rounded-2xl border border-blue-400/30 bg-white/90 px-5 py-4 text-center shadow-glow dark:bg-slate-900/90">
+                <p class="text-lg font-semibold text-blue-600 dark:text-blue-300">Drop your JSON file here</p>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">We’ll load it instantly.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <div class="mb-2 flex items-center justify-between">
+                <h3 class="text-sm font-semibold">Validation</h3>
+                <span id="errorHintBadge" class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">No parse yet</span>
+              </div>
+              <div id="validationPanel" class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <p>Validation feedback appears here with line, column, and a snippet around the error.</p>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <div class="mb-2 flex items-center justify-between">
+                <h3 class="text-sm font-semibold">Quick actions</h3>
+                <span class="text-xs text-slate-500 dark:text-slate-400">Developer shortcuts</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm lg:grid-cols-2">
+                <button id="copyInputBtn" class="rounded-xl border border-slate-300/60 px-3 py-2 text-left transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Copy input</button>
+                <button id="copyPrettyBtn" class="rounded-xl border border-slate-300/60 px-3 py-2 text-left transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Copy pretty</button>
+                <button id="copyMinifiedBtn" class="rounded-xl border border-slate-300/60 px-3 py-2 text-left transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Copy minified</button>
+              </div>
+              <div class="mt-3 rounded-xl bg-slate-100/80 p-3 text-xs text-slate-600 dark:bg-slate-900/80 dark:text-slate-300">
+                <p>Shortcuts: <span class="font-medium">⌘/Ctrl+Shift+P</span> prettify, <span class="font-medium">⌘/Ctrl+Shift+M</span> minify, <span class="font-medium">⌘/Ctrl+F</span> focus search.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="appSection" class="hidden">
+        <div class="glass-strong rounded-3xl p-4 sm:p-5">
+            <div class="mb-4 grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+              <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 class="text-sm font-semibold">Search & filter</h3>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">Key search, value search, regex, exact match, and depth/type filters.</p>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs">
+                    <button id="prevMatchBtn" class="rounded-full border border-slate-300/60 px-2.5 py-1 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Prev</button>
+                    <button id="nextMatchBtn" class="rounded-full border border-slate-300/60 px-2.5 py-1 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Next</button>
+                  </div>
+                </div>
+                <div class="space-y-3">
+                  <div class="flex gap-2">
+                    <input id="searchInput" type="text" class="ui-input w-full rounded-2xl px-3 py-2 text-sm" placeholder="Search keys, values, or paths" />
+                    <select id="searchMode" class="ui-select rounded-2xl px-3 py-2 text-sm">
+                      <option value="both">Both</option>
+                      <option value="key">Keys</option>
+                      <option value="value">Values</option>
+                    </select>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    <label class="inline-flex items-center gap-2 rounded-xl border border-slate-300/60 px-3 py-2 text-xs dark:border-slate-700">
+                      <input id="caseToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" />
+                      Case sensitive
+                    </label>
+                    <label class="inline-flex items-center gap-2 rounded-xl border border-slate-300/60 px-3 py-2 text-xs dark:border-slate-700">
+                      <input id="regexToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" />
+                      Regex
+                    </label>
+                    <label class="inline-flex items-center gap-2 rounded-xl border border-slate-300/60 px-3 py-2 text-xs dark:border-slate-700">
+                      <input id="exactToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" />
+                      Exact
+                    </label>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-3">
+                    <select id="typeFilter" class="ui-select rounded-2xl px-3 py-2 text-sm">
+                      <option value="all">All types</option>
+                      <option value="object">Object</option>
+                      <option value="array">Array</option>
+                      <option value="string">String</option>
+                      <option value="number">Number</option>
+                      <option value="boolean">Boolean</option>
+                      <option value="null">Null</option>
+                    </select>
+                    <input id="depthMin" type="number" min="0" class="ui-input rounded-2xl px-3 py-2 text-sm" placeholder="Min depth" />
+                    <input id="depthMax" type="number" min="0" class="ui-input rounded-2xl px-3 py-2 text-sm" placeholder="Max depth" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <div class="mb-3 flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-semibold">Power tools</h3>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">View settings, copied paths, and pinned hotspots.</p>
+                  </div>
+                  <span id="searchSummary" class="badge bg-blue-500/10 text-blue-700 dark:bg-blue-400/10 dark:text-blue-300">0 results</span>
+                </div>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label class="inline-flex items-center gap-2 rounded-xl border border-slate-300/60 px-3 py-2 text-xs dark:border-slate-700">
+                    <input id="lineNumbersToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" checked />
+                    Line numbers
+                  </label>
+                  <label class="inline-flex items-center gap-2 rounded-xl border border-slate-300/60 px-3 py-2 text-xs dark:border-slate-700">
+                    <input id="wrapToggle" type="checkbox" class="h-4 w-4 rounded border-slate-400 text-blue-500 focus:ring-blue-500" checked />
+                    Wrap long lines
+                  </label>
+                </div>
+                <div class="mt-3 space-y-3">
+                  <div>
+                    <div class="mb-1 flex items-center justify-between">
+                      <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Pinned paths</h4>
+                      <button id="clearPinsBtn" class="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-300">Clear</button>
+                    </div>
+                    <div id="pinnedPaths" class="flex flex-wrap gap-2"></div>
+                  </div>
+                  <div>
+                    <div class="mb-1 flex items-center justify-between">
+                      <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Recent copied</h4>
+                      <button id="clearCopiedBtn" class="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-300">Clear</button>
+                    </div>
+                    <div id="recentCopies" class="flex flex-wrap gap-2"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap gap-2">
+                <button class="tab-btn rounded-full bg-blue-500 px-3 py-1.5 text-sm font-semibold text-white" data-tab="tree">Tree View</button>
+                <button class="tab-btn rounded-full border border-slate-300/60 px-3 py-1.5 text-sm dark:border-slate-700" data-tab="pretty">Pretty JSON</button>
+                <button class="tab-btn rounded-full border border-slate-300/60 px-3 py-1.5 text-sm dark:border-slate-700" data-tab="minified">Minified JSON</button>
+                <button class="tab-btn rounded-full border border-slate-300/60 px-3 py-1.5 text-sm dark:border-slate-700" data-tab="schema">Schema View</button>
+                <button class="tab-btn rounded-full border border-slate-300/60 px-3 py-1.5 text-sm dark:border-slate-700" data-tab="stats">Stats / Insights</button>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <div id="quickStats" class="hidden flex-wrap items-center gap-2"></div>
+                <button id="collapseAllBtn" class="rounded-full border border-slate-300/60 px-3 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Collapse all</button>
+                <button id="expandAllBtn" class="rounded-full border border-slate-300/60 px-3 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">Expand all</button>
+                <button class="expand-level-btn rounded-full border border-slate-300/60 px-3 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-level="2">Level 2</button>
+              </div>
+            </div>
+            <div id="tabPanel" class="grid gap-5 2xl:grid-cols-[minmax(0,1.4fr)_380px]">
+              <div class="min-w-0">
+                <div id="selectedBreadcrumbs" class="mb-3 hidden flex-wrap gap-2"></div>
+                <div id="tabContent" class="glass min-h-[680px] rounded-3xl p-3 sm:p-4"></div>
+              </div>
+              <aside id="inspectorPanel" class="glass hidden rounded-3xl p-4"></aside>
+            </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="embeddedModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+    <div class="glass-strong w-full max-w-4xl rounded-3xl p-4 sm:p-5">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 class="text-lg font-semibold">Embedded JSON viewer</h3>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Inspect JSON detected inside a string value.</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="copyEmbeddedBtn" class="rounded-2xl border border-slate-300/60 px-3 py-2 text-sm dark:border-slate-700">Copy</button>
+          <button id="closeEmbeddedBtn" class="rounded-2xl bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-slate-900">Close</button>
+        </div>
+      </div>
+      <pre id="embeddedContent" class="code-block scroll-area max-h-[60vh] overflow-auto rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-950/60"></pre>
+    </div>
+  </div>
+
+  <div id="toastStack" class="fixed bottom-4 right-4 z-[60] flex w-[min(92vw,380px)] flex-col gap-2"></div>
+
+  <script>
+    const STORAGE_KEYS = {
+      input: "jsonformatter.input",
+      theme: "jsonformatter.theme",
+      pins: "jsonformatter.pins",
+      recentCopies: "jsonformatter.recentCopies",
+      settings: "jsonformatter.settings"
+    };
+
+    const state = {
+      rawInput: "",
+      parsed: null,
+      analysis: null,
+      error: null,
+      tab: "tree",
+      theme: "dark",
+      autoParse: true,
+      sortKeys: false,
+      lineNumbers: true,
+      wrapLines: true,
+      search: {
+        query: "",
+        mode: "both",
+        caseSensitive: false,
+        regex: false,
+        exact: false,
+        type: "all",
+        depthMin: "",
+        depthMax: ""
+      },
+      searchResults: [],
+      activeSearchIndex: 0,
+      searchMatches: new Set(),
+      expandedPaths: new Set(["$"]),
+      selectedPath: "$",
+      arrayChunks: {},
+      showEditor: true,
+      pinnedPaths: [],
+      recentCopies: [],
+      embeddedJsonPreview: ""
+    };
+
+    const elements = {};
+
+    function cacheElements() {
+      [
+        "jsonInput", "validityBadge", "errorHintBadge", "validationPanel", "dropZone", "dropOverlay",
+        "inputMeta", "searchInput", "searchMode", "caseToggle", "regexToggle", "exactToggle",
+        "typeFilter", "depthMin", "depthMax", "searchSummary", "tabContent", "inspectorPanel",
+        "selectedBreadcrumbs", "autoParseToggle", "sortKeysToggle", "lineNumbersToggle",
+        "wrapToggle", "pinnedPaths", "recentCopies", "themeToggle", "embeddedModal", "embeddedContent",
+        "copyEmbeddedBtn", "closeEmbeddedBtn", "fileInput", "toastStack"
+      ].forEach((id) => {
+        elements[id] = document.getElementById(id);
+      });
+      elements.mainGrid = document.getElementById("mainGrid");
+      elements.editorSection = document.getElementById("editorSection");
+      elements.appSection = document.getElementById("appSection");
+      elements.editBtn = document.getElementById("editBtn");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function debounce(fn, wait = 250) {
+      let timer;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+      };
+    }
+
+    function getType(value) {
+      if (value === null) return "null";
+      if (Array.isArray(value)) return "array";
+      return typeof value === "object" ? "object" : typeof value;
+    }
+
+    function formatBytes(charCount) {
+      const bytes = new Blob([charCount]).size;
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function truncate(value, max = 88) {
+      const text = String(value);
+      return text.length > max ? `${text.slice(0, max)}…` : text;
+    }
+
+    function safeJsonString(value, spacing = 2) {
+      return JSON.stringify(value, null, spacing);
+    }
+
+    function cloneSorted(value) {
+      const type = getType(value);
+      if (type === "array") return value.map(cloneSorted);
+      if (type === "object") {
+        return Object.keys(value).sort((a, b) => a.localeCompare(b)).reduce((acc, key) => {
+          acc[key] = cloneSorted(value[key]);
+          return acc;
+        }, {});
+      }
+      return value;
+    }
+
+    function valuePreview(value, type) {
+      if (type === "object") return `{${Object.keys(value).length} keys}`;
+      if (type === "array") {
+        const preview = value.slice(0, 3).map((item) => {
+          const itemType = getType(item);
+          return itemType === "object" ? "{…}" : itemType === "array" ? "[…]" : JSON.stringify(item);
+        }).join(", ");
+        return `[${value.length} items${preview ? `: ${truncate(preview, 42)}` : ""}]`;
+      }
+      if (type === "string") return `"${truncate(value, 120)}"`;
+      return JSON.stringify(value);
+    }
+
+    function inferDetections(value, key) {
+      const detections = [];
+      if (typeof value === "string") {
+        if (/^https?:\/\/\S+/i.test(value)) detections.push("URL-like");
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) detections.push("Email-like");
+        if (!Number.isNaN(Date.parse(value)) && /[-/:T]/.test(value)) detections.push("Date-like");
+        if (value.length > 120) detections.push("Long text");
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed && typeof parsed === "object") detections.push("Embedded JSON");
+        } catch {}
+      }
+      if (typeof key === "string" && /(^(id|uuid)$|Id$|ID$|_id$)/.test(key)) detections.push("Likely ID");
+      return detections;
+    }
+
+    function buildPath(parentPath, key, isArrayIndex) {
+      if (parentPath === "$" && !isArrayIndex) return `$.${key}`;
+      return isArrayIndex ? `${parentPath}[${key}]` : `${parentPath}.${key}`;
+    }
+
+    function buildNormalizedPath(parentPath, key, isArrayIndex) {
+      if (parentPath === "$" && !isArrayIndex) return `$.${key}`;
+      return isArrayIndex ? `${parentPath}[]` : `${parentPath}.${key}`;
+    }
+
+    function helpForError(message) {
+      const lower = message.toLowerCase();
+      if (lower.includes("unexpected token")) return "Hint: check for a trailing comma, missing quote, or stray character near the reported location.";
+      if (lower.includes("unexpected end")) return "Hint: a closing brace, bracket, or quote may be missing.";
+      if (lower.includes("position")) return "Hint: look for an invalid comma, quote, or escape sequence right before the failing position.";
+      return "Hint: verify quotes around keys/strings and ensure arrays/objects are closed correctly.";
+    }
+
+    function buildErrorInfo(input, error) {
+      const message = error && error.message ? error.message : "Invalid JSON";
+      const match = message.match(/position\s+(\d+)/i);
+      let position = match ? Number(match[1]) : -1;
+      if (position < 0) {
+        const alt = message.match(/at line (\d+) column (\d+)/i);
+        if (alt) {
+          const line = Number(alt[1]);
+          const column = Number(alt[2]);
+          const lines = input.split("\n");
+          let count = 0;
+          for (let index = 0; index < line - 1; index += 1) count += lines[index].length + 1;
+          position = count + column - 1;
+        }
+      }
+      let line = 1;
+      let column = 1;
+      if (position >= 0) {
+        for (let index = 0; index < position; index += 1) {
+          if (input[index] === "\n") {
+            line += 1;
+            column = 1;
+          } else {
+            column += 1;
+          }
+        }
+      }
+      const start = Math.max(0, position - 50);
+      const end = position >= 0 ? Math.min(input.length, position + 70) : Math.min(input.length, 120);
+      const snippet = input.slice(start, end);
+      return {
+        message,
+        line,
+        column,
+        snippet,
+        hint: helpForError(message)
+      };
+    }
+
+    function normalizePatternMap(map) {
+      return [...map.entries()].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+    }
+
+    function analyzeJson(data) {
+      const stats = {
+        totalNodes: 0,
+        totalKeys: 0,
+        totalObjects: 0,
+        totalArrays: 0,
+        totalStrings: 0,
+        totalNumbers: 0,
+        totalBooleans: 0,
+        totalNulls: 0,
+        totalLeafNodes: 0,
+        maxDepth: 0,
+        largestArrayLength: 0,
+        averageKeysPerObject: 0,
+        averageItemsPerArray: 0,
+        longestStringLength: 0,
+        approxChars: safeJsonString(data, 2).length,
+        prettifiedLines: safeJsonString(data, 2).split("\n").length,
+        widestArraySize: 0
+      };
+
+      const nodeMap = new Map();
+      const keyFrequency = new Map();
+      const schemaMap = new Map();
+      const nullPaths = [];
+      const emptyArrays = [];
+      const emptyObjects = [];
+      const urlPaths = [];
+      const emailPaths = [];
+      const datePaths = [];
+      const longTextPaths = [];
+      const likelyIdPaths = [];
+      const mixedArrays = [];
+      const inconsistentArrays = [];
+      const repeatedArraySchemas = [];
+      const objectKeyCounts = [];
+      const arrayLengths = [];
+
+      function ensureSchemaEntry(path, parentPath, type, value) {
+        if (!schemaMap.has(path)) {
+          schemaMap.set(path, {
+            path,
+            parentPath,
+            typeCounts: new Map(),
+            count: 0,
+            examples: [],
+            sampleValues: new Set()
+          });
+        }
+        const entry = schemaMap.get(path);
+        entry.count += 1;
+        entry.typeCounts.set(type, (entry.typeCounts.get(type) || 0) + 1);
+        if (entry.examples.length < 3) {
+          const display = type === "object" || type === "array" ? valuePreview(value, type) : truncate(JSON.stringify(value), 72);
+          if (!entry.sampleValues.has(display)) {
+            entry.examples.push(display);
+            entry.sampleValues.add(display);
+          }
+        }
+      }
+
+      function walk(value, path, normalizedPath, depth, parentPath, parentType, key, siblingCount) {
+        const type = getType(value);
+        const detections = inferDetections(value, key);
+        const meta = {
+          path,
+          normalizedPath,
+          depth,
+          parentPath,
+          parentType,
+          key,
+          type,
+          value,
+          valuePreview: valuePreview(value, type),
+          childCount: type === "object" ? Object.keys(value).length : type === "array" ? value.length : 0,
+          siblingCount,
+          detections,
+          children: []
+        };
+        nodeMap.set(path, meta);
+        stats.totalNodes += 1;
+        stats.maxDepth = Math.max(stats.maxDepth, depth);
+        ensureSchemaEntry(normalizedPath, normalizedPath === "$" ? null : normalizedPath.replace(/(\[\]|(?:\.[^.[]+)|\[[0-9]+\])$/, ""), type, value);
+
+        if (typeof key === "string") keyFrequency.set(key, (keyFrequency.get(key) || 0) + 1);
+        if (detections.includes("URL-like")) urlPaths.push(path);
+        if (detections.includes("Email-like")) emailPaths.push(path);
+        if (detections.includes("Date-like")) datePaths.push(path);
+        if (detections.includes("Long text")) longTextPaths.push(path);
+        if (detections.includes("Likely ID")) likelyIdPaths.push(path);
+
+        if (type === "object") {
+          stats.totalObjects += 1;
+          const keys = Object.keys(value);
+          stats.totalKeys += keys.length;
+          objectKeyCounts.push(keys.length);
+          if (!keys.length) emptyObjects.push(path);
+          keys.forEach((childKey) => {
+            const childPath = buildPath(path, childKey, false);
+            const childNormalized = buildNormalizedPath(normalizedPath, childKey, false);
+            meta.children.push({ path: childPath, key: childKey, index: null });
+            walk(value[childKey], childPath, childNormalized, depth + 1, path, type, childKey, keys.length);
+          });
+        } else if (type === "array") {
+          stats.totalArrays += 1;
+          stats.largestArrayLength = Math.max(stats.largestArrayLength, value.length);
+          stats.widestArraySize = Math.max(stats.widestArraySize, value.length);
+          arrayLengths.push(value.length);
+          if (!value.length) emptyArrays.push(path);
+          const elementTypes = new Set();
+          const signatures = new Map();
+          value.forEach((item, index) => {
+            const itemType = getType(item);
+            elementTypes.add(itemType);
+            if (itemType === "object" && item && !Array.isArray(item)) {
+              const signature = Object.keys(item).sort().join("|");
+              signatures.set(signature, (signatures.get(signature) || 0) + 1);
+            }
+            const childPath = buildPath(path, index, true);
+            const childNormalized = buildNormalizedPath(normalizedPath, index, true);
+            meta.children.push({ path: childPath, key: null, index });
+            walk(item, childPath, childNormalized, depth + 1, path, type, index, value.length);
+          });
+          if (elementTypes.size > 1) mixedArrays.push({ path, types: [...elementTypes] });
+          if (signatures.size > 1) inconsistentArrays.push({ path, shapes: [...signatures.keys()] });
+          if (signatures.size === 1 && value.length > 2) repeatedArraySchemas.push({ path, signature: [...signatures.keys()][0] });
+        } else {
+          stats.totalLeafNodes += 1;
+          if (type === "string") stats.totalStrings += 1;
+          if (type === "number") stats.totalNumbers += 1;
+          if (type === "boolean") stats.totalBooleans += 1;
+          if (type === "null") {
+            stats.totalNulls += 1;
+            nullPaths.push(path);
+          }
+          if (type === "string") stats.longestStringLength = Math.max(stats.longestStringLength, value.length);
+        }
+      }
+
+      walk(data, "$", "$", 0, null, null, null, 0);
+
+      stats.averageKeysPerObject = stats.totalObjects ? objectKeyCounts.reduce((sum, count) => sum + count, 0) / stats.totalObjects : 0;
+      stats.averageItemsPerArray = stats.totalArrays ? arrayLengths.reduce((sum, count) => sum + count, 0) / stats.totalArrays : 0;
+
+      const topRepeatedKeys = normalizePatternMap(keyFrequency).slice(0, 8);
+
+      const schemaRows = [...schemaMap.values()].map((entry) => {
+        const typeCounts = [...entry.typeCounts.entries()].sort((a, b) => b[1] - a[1]);
+        const dominantType = typeCounts[0] ? typeCounts[0][0] : "unknown";
+        const parentCount = entry.parentPath && schemaMap.get(entry.parentPath) ? schemaMap.get(entry.parentPath).count : 1;
+        const requirement = entry.path === "$" ? "root" : entry.count === parentCount ? "always present" : "optional";
+        return {
+          path: entry.path,
+          type: typeCounts.length > 1 ? typeCounts.map(([name, count]) => `${name} (${count})`).join(", ") : dominantType,
+          dominantType,
+          count: entry.count,
+          parentCount,
+          requirement,
+          examples: entry.examples
+        };
+      }).sort((a, b) => a.path.localeCompare(b.path));
+
+      const numericHeavy = schemaRows.filter((row) => row.dominantType === "number" && row.count >= 2).slice(0, 6);
+
+      let profile = "Nested document";
+      if (nodeMap.has("$.data") || nodeMap.has("$.meta") || nodeMap.has("$.errors")) profile = "API response";
+      if (nodeMap.has("$.events")) profile = "Analytics payload";
+      if (nodeMap.has("$.featureFlags") || nodeMap.has("$.flags")) profile = "Config / flags";
+
+      return {
+        stats,
+        nodeMap,
+        schemaRows,
+        insights: {
+          profile,
+          nullPaths,
+          emptyArrays,
+          emptyObjects,
+          urlPaths,
+          emailPaths,
+          datePaths,
+          longTextPaths,
+          likelyIdPaths,
+          mixedArrays,
+          inconsistentArrays,
+          repeatedArraySchemas,
+          numericHeavy,
+          topRepeatedKeys
+        }
+      };
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEYS.input, state.rawInput);
+      localStorage.setItem(STORAGE_KEYS.theme, state.theme);
+      localStorage.setItem(STORAGE_KEYS.pins, JSON.stringify(state.pinnedPaths));
+      localStorage.setItem(STORAGE_KEYS.recentCopies, JSON.stringify(state.recentCopies));
+      localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({
+        autoParse: state.autoParse,
+        sortKeys: state.sortKeys,
+        lineNumbers: state.lineNumbers,
+        wrapLines: state.wrapLines
+      }));
+    }
+
+    function loadPersistedState() {
+      state.rawInput = localStorage.getItem(STORAGE_KEYS.input) || "";
+      state.theme = localStorage.getItem(STORAGE_KEYS.theme) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      state.pinnedPaths = JSON.parse(localStorage.getItem(STORAGE_KEYS.pins) || "[]");
+      state.recentCopies = JSON.parse(localStorage.getItem(STORAGE_KEYS.recentCopies) || "[]");
+      const settings = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || "{}");
+      state.autoParse = settings.autoParse !== false;
+      state.sortKeys = !!settings.sortKeys;
+      state.lineNumbers = settings.lineNumbers !== false;
+      state.wrapLines = settings.wrapLines !== false;
+    }
+
+    function applyTheme() {
+      document.documentElement.classList.toggle("dark", state.theme === "dark");
+      elements.themeToggle.textContent = state.theme === "dark" ? "☀️ Light" : "🌙 Dark";
+    }
+
+    function setValidityBadge(kind, text) {
+      const base = "badge";
+      if (kind === "valid") {
+        elements.validityBadge.className = `${base} bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300`;
+      } else if (kind === "invalid") {
+        elements.validityBadge.className = `${base} bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300`;
+      } else {
+        elements.validityBadge.className = `${base} bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300`;
+      }
+      elements.validityBadge.textContent = text;
+    }
+
+    function showToast(message, tone = "default") {
+      const palette = {
+        default: "border-slate-300/60 bg-white/90 text-slate-800 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100",
+        success: "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
+        error: "border-rose-300/50 bg-rose-500/10 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
+      };
+      const toast = document.createElement("div");
+      toast.className = `toast-enter rounded-2xl border px-4 py-3 text-sm shadow-lg ${palette[tone] || palette.default}`;
+      toast.textContent = message;
+      elements.toastStack.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 2800);
+    }
+
+    async function copyToClipboard(text, label = "Copied") {
+      try {
+        await navigator.clipboard.writeText(text);
+        state.recentCopies = [truncate(text, 46), ...state.recentCopies.filter((item) => item !== truncate(text, 46))].slice(0, 8);
+        renderRecentCopies();
+        saveState();
+        showToast(label, "success");
+      } catch {
+        showToast("Clipboard copy failed.", "error");
+      }
+    }
+
+    function downloadFile(name, content, type = "application/json") {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function updateInputMeta() {
+      const lines = state.rawInput ? state.rawInput.split("\n").length : 0;
+      elements.inputMeta.textContent = `${state.rawInput.length.toLocaleString()} chars • ${lines.toLocaleString()} lines`;
+    }
+
+    function prettifiedString() {
+      if (!state.parsed) return "";
+      const view = state.sortKeys ? cloneSorted(state.parsed) : state.parsed;
+      return safeJsonString(view, 2);
+    }
+
+    function minifiedString() {
+      if (!state.parsed) return "";
+      const view = state.sortKeys ? cloneSorted(state.parsed) : state.parsed;
+      return safeJsonString(view, 0);
+    }
+
+    function parseJsonInput({ silent = false } = {}) {
+      const wasParsed = !!state.parsed;
+      const input = state.rawInput.trim();
+      if (!input) {
+        state.parsed = null;
+        state.analysis = null;
+        state.error = null;
+        state.showEditor = true;
+        setValidityBadge("idle", "Idle");
+        elements.errorHintBadge.className = "badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300";
+        elements.errorHintBadge.textContent = "Empty";
+        elements.validationPanel.innerHTML = `<p>No JSON loaded yet. Paste content or load a sample to begin.</p>`;
+        render();
+        return false;
+      }
+      try {
+        const parsed = JSON.parse(state.rawInput);
+        state.parsed = parsed;
+        state.analysis = analyzeJson(parsed);
+        state.error = null;
+        setValidityBadge("valid", "Valid JSON");
+        elements.errorHintBadge.className = "badge bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300";
+        elements.errorHintBadge.textContent = "Ready";
+        elements.validationPanel.innerHTML = `
+          <div class="rounded-xl border border-emerald-300/40 bg-emerald-500/5 p-3">
+            <p class="font-medium text-emerald-700 dark:text-emerald-300">JSON parsed successfully.</p>
+            <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">Payload size: ${formatBytes(state.rawInput)} • Max depth: ${state.analysis.stats.maxDepth} • Nodes: ${state.analysis.stats.totalNodes}</p>
+          </div>
+        `;
+        if (!silent) showToast("JSON parsed successfully.", "success");
+        state.showEditor = false;
+        if (!wasParsed) state.tab = "tree";
+        state.selectedPath = state.analysis.nodeMap.has(state.selectedPath) ? state.selectedPath : "$";
+        computeSearchResults();
+        render();
+        if (!wasParsed) {
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            const treeScroll = document.querySelector("#tabContent .scroll-area");
+            if (treeScroll) treeScroll.scrollTop = 0;
+          });
+        }
+        return true;
+      } catch (error) {
+        const info = buildErrorInfo(state.rawInput, error);
+        state.parsed = null;
+        state.analysis = null;
+        state.error = info;
+        state.showEditor = true;
+        setValidityBadge("invalid", "Invalid JSON");
+        elements.errorHintBadge.className = "badge bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300";
+        elements.errorHintBadge.textContent = `Line ${info.line}, Col ${info.column}`;
+        elements.validationPanel.innerHTML = `
+          <div class="space-y-2 rounded-xl border border-rose-300/40 bg-rose-500/5 p-3">
+            <p class="font-medium text-rose-700 dark:text-rose-300">${escapeHtml(info.message)}</p>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Line ${info.line}, column ${info.column}</p>
+            <pre class="code-block overflow-auto rounded-xl bg-slate-900/90 p-3 text-xs text-slate-100">${escapeHtml(info.snippet || state.rawInput.slice(0, 120))}</pre>
+            <p class="text-xs text-slate-600 dark:text-slate-300">${escapeHtml(info.hint)}</p>
+          </div>
+        `;
+        computeSearchResults();
+        render();
+        if (!silent) showToast("JSON is invalid. See validation details.", "error");
+        return false;
+      }
+    }
+
+    function renderQuickStats() {
+      if (!elements.quickStats) elements.quickStats = document.getElementById("quickStats");
+      if (!elements.quickStats) return;
+      if (!state.analysis) {
+        elements.quickStats.classList.add("hidden");
+        elements.quickStats.innerHTML = "";
+        return;
+      }
+      const { stats } = state.analysis;
+      const items = [
+        { label: "Nodes", value: stats.totalNodes.toLocaleString() },
+        { label: "Depth", value: String(stats.maxDepth) },
+        { label: "Size", value: formatBytes(state.rawInput) },
+        { label: "Keys", value: stats.totalKeys.toLocaleString() }
+      ];
+      elements.quickStats.classList.remove("hidden");
+      elements.quickStats.innerHTML = items.map((item) => `
+        <span class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">
+          ${escapeHtml(item.label)}: <span class="font-semibold">${escapeHtml(item.value)}</span>
+        </span>
+      `).join("");
+    }
+
+    function renderRecentCopies() {
+      elements.recentCopies.innerHTML = state.recentCopies.length
+        ? state.recentCopies.map((item) => `<button class="rounded-full border border-slate-300/60 px-3 py-1.5 text-xs transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-copy-preview="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")
+        : `<span class="text-xs text-slate-500 dark:text-slate-400">Nothing copied yet.</span>`;
+    }
+
+    function renderPinnedPaths() {
+      elements.pinnedPaths.innerHTML = state.pinnedPaths.length
+        ? state.pinnedPaths.map((path) => `<button class="rounded-full border border-blue-300/50 bg-blue-500/10 px-3 py-1.5 text-xs text-blue-700 transition hover:bg-blue-500/15 dark:border-blue-500/30 dark:text-blue-300" data-jump-path="${escapeHtml(path)}">${escapeHtml(path)}</button>`).join("")
+        : `<span class="text-xs text-slate-500 dark:text-slate-400">Pin paths from the inspector to revisit them quickly.</span>`;
+    }
+
+    function compileMatcher() {
+      const query = state.search.query;
+      if (!query) return null;
+      if (state.search.regex) {
+        try {
+          return new RegExp(query, state.search.caseSensitive ? "g" : "gi");
+        } catch {
+          return null;
+        }
+      }
+      return query;
+    }
+
+    function matchesQuery(text, matcher) {
+      if (matcher === null) return true;
+      if (matcher instanceof RegExp) {
+        matcher.lastIndex = 0;
+        return matcher.test(text);
+      }
+      const haystack = state.search.caseSensitive ? text : text.toLowerCase();
+      const needle = state.search.caseSensitive ? matcher : matcher.toLowerCase();
+      if (state.search.exact) return haystack === needle;
+      return haystack.includes(needle);
+    }
+
+    function metaMatches(meta, matcher) {
+      const { type } = meta;
+      if (state.search.type !== "all" && type !== state.search.type) return false;
+      const minDepth = state.search.depthMin === "" ? -Infinity : Number(state.search.depthMin);
+      const maxDepth = state.search.depthMax === "" ? Infinity : Number(state.search.depthMax);
+      if (meta.depth < minDepth || meta.depth > maxDepth) return false;
+
+      const keyText = meta.key === null || typeof meta.key === "number" ? String(meta.key ?? "root") : meta.key;
+      const valueText = type === "object" || type === "array" ? meta.valuePreview : String(meta.value);
+      if (!matcher) return state.search.type !== "all" || state.search.depthMin !== "" || state.search.depthMax !== "";
+
+      if (state.search.mode === "key") return matchesQuery(keyText, matcher) || matchesQuery(meta.path, matcher);
+      if (state.search.mode === "value") return matchesQuery(valueText, matcher);
+      return matchesQuery(keyText, matcher) || matchesQuery(valueText, matcher) || matchesQuery(meta.path, matcher);
+    }
+
+    function expandAncestors(path) {
+      let current = path;
+      while (current && current !== "$") {
+        const meta = state.analysis && state.analysis.nodeMap.get(current);
+        if (!meta) break;
+        if (meta.parentPath) state.expandedPaths.add(meta.parentPath);
+        current = meta.parentPath;
+      }
+      state.expandedPaths.add("$");
+    }
+
+    function computeSearchResults() {
+      state.searchResults = [];
+      state.searchMatches = new Set();
+      if (!state.analysis) {
+        elements.searchSummary.textContent = "0 results";
+        return;
+      }
+      const matcher = compileMatcher();
+      const matches = [];
+      state.analysis.nodeMap.forEach((meta, path) => {
+        if (path === "$" && !state.search.query && state.search.type === "all" && state.search.depthMin === "" && state.search.depthMax === "") return;
+        if (metaMatches(meta, matcher)) matches.push(path);
+      });
+      state.searchResults = matches;
+      state.searchMatches = new Set(matches);
+      if (state.activeSearchIndex >= state.searchResults.length) state.activeSearchIndex = 0;
+      elements.searchSummary.textContent = `${matches.length} result${matches.length === 1 ? "" : "s"}`;
+      if (matches.length) expandAncestors(state.searchResults[state.activeSearchIndex]);
+    }
+
+    function activeSearchPath() {
+      return state.searchResults[state.activeSearchIndex] || "";
+    }
+
+    function buildVisiblePathSet() {
+      if (!state.analysis || !state.searchResults.length) return null;
+      const visible = new Set(["$"]);
+      state.searchResults.forEach((path) => {
+        let current = path;
+        while (current) {
+          visible.add(current);
+          const meta = state.analysis.nodeMap.get(current);
+          current = meta ? meta.parentPath : null;
+        }
+      });
+      return visible;
+    }
+
+    function sortedChildren(meta) {
+      if (!meta.children) return [];
+      if (!state.sortKeys || meta.type !== "object") return meta.children;
+      return [...meta.children].sort((a, b) => String(a.key).localeCompare(String(b.key)));
+    }
+
+    function renderTreeView() {
+      if (!state.analysis) {
+        return `
+          <div class="flex h-full min-h-[620px] items-center justify-center rounded-3xl border border-dashed border-slate-300/70 bg-white/40 text-center dark:border-slate-700 dark:bg-slate-950/30">
+            <div>
+              <p class="text-lg font-semibold">No parsed tree yet</p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Load JSON to explore structure, search branches, and inspect node metadata.</p>
+            </div>
+          </div>
+        `;
+      }
+
+      const visiblePaths = buildVisiblePathSet();
+
+      function renderNode(path) {
+        const meta = state.analysis.nodeMap.get(path);
+        if (!meta) return "";
+        if (visiblePaths && !visiblePaths.has(path)) return "";
+        const isSelected = state.selectedPath === path;
+        const isMatched = state.searchMatches.has(path);
+        const isActiveMatch = activeSearchPath() === path;
+        const hasChildren = meta.children.length > 0;
+        const expanded = meta.depth === 0 || state.expandedPaths.has(path);
+        const label = meta.depth === 0 ? "root" : meta.parentType === "array" ? `[${meta.key}]` : meta.key;
+        const badgeClasses = {
+          object: "bg-sky-500/10 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300",
+          array: "bg-violet-500/10 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300",
+          string: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300",
+          number: "bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300",
+          boolean: "bg-orange-500/10 text-orange-700 dark:bg-orange-400/10 dark:text-orange-300",
+          null: "bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300"
+        };
+        const rowClasses = [
+          "tree-row",
+          "relative",
+          "rounded-2xl",
+          "px-2",
+          "py-2"
+        ];
+        if (isSelected) rowClasses.push("is-selected");
+        if (isMatched) rowClasses.push("is-match");
+        if (isActiveMatch) rowClasses.push("is-active-match");
+
+        const valueClass = `type-${meta.type === "null" ? "null" : meta.type}`;
+        const preview = meta.type === "string"
+          ? `"${escapeHtml(truncate(meta.value, 160))}"`
+          : escapeHtml(meta.valuePreview);
+        const actions = `
+          <div class="tree-actions ml-auto flex items-center gap-1 text-slate-600 dark:text-slate-300">
+            <button class="tree-action-btn rounded-xl px-2 py-1 text-xs" title="Copy path" data-copy-path="${escapeHtml(path)}">Copy path</button>
+          </div>
+        `;
+        let childrenHtml = "";
+        if (hasChildren && expanded) {
+          const chunkSize = state.arrayChunks[path] || 50;
+          const children = sortedChildren(meta);
+          const items = meta.type === "array" ? children.slice(0, chunkSize) : children;
+          childrenHtml = items.map((child) => renderNode(child.path)).join("");
+          if (meta.type === "array" && children.length > chunkSize) {
+            childrenHtml += `
+              <div class="ml-[calc(${(meta.depth + 1) * 1.125}rem)] mt-2">
+                <button class="rounded-xl border border-slate-300/60 px-3 py-1.5 text-xs transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-show-more="${escapeHtml(path)}">
+                  Show ${Math.min(50, children.length - chunkSize)} more (${chunkSize}/${children.length})
+                </button>
+              </div>
+            `;
+          }
+        }
+
+        return `
+          <div>
+            <div class="${rowClasses.join(" ")}" style="--indent:${meta.depth * 1.125}rem; --guide-opacity:${meta.depth > 0 ? 1 : 0}" data-path="${escapeHtml(path)}" data-depth="${meta.depth}">
+              <div class="flex min-w-0 items-start gap-2 pl-[calc(var(--indent))]">
+                <button class="tree-toggle mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-600 dark:text-slate-300 ${hasChildren ? "" : "opacity-30"}" data-toggle="${escapeHtml(path)}" ${hasChildren ? "" : "disabled"}>
+                  ${hasChildren ? (expanded ? `<svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"/></svg>` : `<svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor"><path d="M7.21 14.77a.75.75 0 01.02-1.06L11.17 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.24a.75.75 0 010 1.08l-4.5 4.24a.75.75 0 01-1.06-.02z"/></svg>`) : `<span class="text-xs">•</span>`}
+                </button>
+                <div class="tree-label min-w-0 flex-1 cursor-pointer" data-select="${escapeHtml(path)}">
+                  <span class="type-key truncate font-semibold">${escapeHtml(label)}</span>
+                  <span class="type-muted">${meta.depth === 0 ? "" : ":"}</span>
+                  <span class="${valueClass} min-w-0 truncate">${preview}</span>
+                  <span class="badge ${badgeClasses[meta.type]}">${meta.type}</span>
+                  ${meta.detections.slice(0, 2).map((item) => `<span class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">${escapeHtml(item)}</span>`).join("")}
+                </div>
+                ${actions}
+              </div>
+            </div>
+            ${childrenHtml}
+          </div>
+        `;
+      }
+
+      return `<div class="scroll-area h-[640px] overflow-auto pr-1">${renderNode("$")}</div>`;
+    }
+
+    function highlightJson(json) {
+      return escapeHtml(json)
+        .replace(/(&quot;.*?&quot;)(?=\s*:)/g, `<span class="type-key">$1</span>`)
+        .replace(/: (&quot;.*?&quot;)/g, `: <span class="type-string">$1</span>`)
+        .replace(/\b(true|false)\b/g, `<span class="type-boolean">$1</span>`)
+        .replace(/\b(null)\b/g, `<span class="type-null">$1</span>`)
+        .replace(/(-?\b\d+\.?\d*(?:e[+\-]?\d+)?\b)/gi, `<span class="type-number">$1</span>`);
+    }
+
+    function renderCodeView(content, emptyMessage) {
+      if (!content) {
+        return `<div class="flex h-full min-h-[620px] items-center justify-center text-center"><div><p class="text-lg font-semibold">${emptyMessage}</p></div></div>`;
+      }
+      const lines = content.split("\n");
+      const wrapClass = state.wrapLines ? "wrap-enabled" : "";
+      return `
+        <div class="scroll-area ${wrapClass} h-[640px] overflow-auto rounded-2xl border border-slate-200/80 bg-white/60 p-2 dark:border-slate-800 dark:bg-slate-950/40">
+          <div class="code-block">
+            ${lines.map((line, index) => `
+              <div class="line-grid">
+                ${state.lineNumbers ? `<span class="line-no">${index + 1}</span>` : ""}
+                <span class="line-content">${highlightJson(line || " ")}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSchemaView() {
+      if (!state.analysis) return `<div class="flex h-full min-h-[620px] items-center justify-center"><p class="text-sm text-slate-600 dark:text-slate-300">Parse JSON to infer a schema view.</p></div>`;
+      const rows = state.analysis.schemaRows;
+      return `
+        <div class="scroll-area h-[640px] overflow-auto rounded-2xl border border-slate-200/80 bg-white/60 dark:border-slate-800 dark:bg-slate-950/40">
+          <table class="min-w-full text-left text-sm">
+            <thead class="sticky top-0 bg-white/95 text-xs uppercase tracking-wide text-slate-500 shadow-sm dark:bg-slate-950/95 dark:text-slate-400">
+              <tr>
+                <th class="px-4 py-3">Path</th>
+                <th class="px-4 py-3">Type</th>
+                <th class="px-4 py-3">Presence</th>
+                <th class="px-4 py-3">Count</th>
+                <th class="px-4 py-3">Examples</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => `
+                <tr class="border-t border-slate-200/80 dark:border-slate-800">
+                  <td class="px-4 py-3 align-top"><button class="font-mono text-xs text-blue-600 hover:text-blue-500 dark:text-blue-300" data-jump-path="${escapeHtml(row.path)}">${escapeHtml(row.path)}</button></td>
+                  <td class="px-4 py-3 align-top">${escapeHtml(row.type)}</td>
+                  <td class="px-4 py-3 align-top">${escapeHtml(row.requirement)}</td>
+                  <td class="px-4 py-3 align-top">${row.count}</td>
+                  <td class="px-4 py-3 align-top text-xs text-slate-600 dark:text-slate-300">${row.examples.map((example) => escapeHtml(example)).join("<br/>")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderProgressRow(label, value, total, color) {
+      const percent = total ? Math.min(100, Math.round((value / total) * 100)) : 0;
+      return `
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-xs">
+            <span>${escapeHtml(label)}</span>
+            <span>${value}</span>
+          </div>
+          <div class="h-2 rounded-full bg-slate-200/80 dark:bg-slate-800">
+            <div class="h-full rounded-full ${color}" style="width:${percent}%"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderInsightsView() {
+      if (!state.analysis) return `<div class="flex h-full min-h-[620px] items-center justify-center"><p class="text-sm text-slate-600 dark:text-slate-300">Insights appear after parsing.</p></div>`;
+      const { stats, insights } = state.analysis;
+      const leafTotal = Math.max(1, stats.totalLeafNodes);
+      return `
+        <div class="scroll-area h-[640px] space-y-4 overflow-auto pr-1">
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <h3 class="text-sm font-semibold">Structure profile</h3>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">${escapeHtml(insights.profile)}</p>
+              <div class="mt-4 space-y-3">
+                ${renderProgressRow("Strings", stats.totalStrings, leafTotal, "bg-emerald-500")}
+                ${renderProgressRow("Numbers", stats.totalNumbers, leafTotal, "bg-indigo-500")}
+                ${renderProgressRow("Booleans", stats.totalBooleans, leafTotal, "bg-orange-500")}
+                ${renderProgressRow("Nulls", stats.totalNulls, leafTotal, "bg-rose-500")}
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <h3 class="text-sm font-semibold">Top repeated keys</h3>
+              <div class="mt-3 space-y-2 text-sm">
+                ${insights.topRepeatedKeys.length ? insights.topRepeatedKeys.map((item) => `
+                  <div class="flex items-center justify-between rounded-xl bg-slate-100/90 px-3 py-2 dark:bg-slate-900/80">
+                    <span>${escapeHtml(item.name)}</span>
+                    <span class="text-slate-500 dark:text-slate-400">${item.count}</span>
+                  </div>
+                `).join("") : `<p class="text-slate-600 dark:text-slate-300">No repeated keys detected.</p>`}
+              </div>
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <h3 class="text-sm font-semibold">Potential hotspots</h3>
+              <ul class="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <li>Null-valued paths: <span class="font-medium">${insights.nullPaths.length}</span></li>
+                <li>Empty arrays: <span class="font-medium">${insights.emptyArrays.length}</span></li>
+                <li>Empty objects: <span class="font-medium">${insights.emptyObjects.length}</span></li>
+                <li>Mixed-type arrays: <span class="font-medium">${insights.mixedArrays.length}</span></li>
+                <li>Inconsistent object arrays: <span class="font-medium">${insights.inconsistentArrays.length}</span></li>
+              </ul>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <h3 class="text-sm font-semibold">Pattern detections</h3>
+              <ul class="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <li>Likely IDs: <span class="font-medium">${insights.likelyIdPaths.length}</span></li>
+                <li>Date-like strings: <span class="font-medium">${insights.datePaths.length}</span></li>
+                <li>URL-like strings: <span class="font-medium">${insights.urlPaths.length}</span></li>
+                <li>Email-like strings: <span class="font-medium">${insights.emailPaths.length}</span></li>
+                <li>Long text fields: <span class="font-medium">${insights.longTextPaths.length}</span></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <h3 class="text-sm font-semibold">Suspicious arrays</h3>
+              <div class="mt-3 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                ${insights.mixedArrays.length ? insights.mixedArrays.slice(0, 6).map((item) => `
+                  <button class="block w-full rounded-xl border border-slate-200/80 px-3 py-2 text-left transition hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-900" data-jump-path="${escapeHtml(item.path)}">
+                    <span class="font-mono">${escapeHtml(item.path)}</span>
+                    <span class="mt-1 block text-slate-500 dark:text-slate-400">${escapeHtml(item.types.join(", "))}</span>
+                  </button>
+                `).join("") : `<p>No mixed-type arrays detected.</p>`}
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+              <h3 class="text-sm font-semibold">Numeric-heavy fields</h3>
+              <div class="mt-3 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                ${insights.numericHeavy.length ? insights.numericHeavy.map((row) => `
+                  <button class="block w-full rounded-xl border border-slate-200/80 px-3 py-2 text-left transition hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-900" data-jump-path="${escapeHtml(row.path)}">
+                    <span class="font-mono">${escapeHtml(row.path)}</span>
+                    <span class="mt-1 block text-slate-500 dark:text-slate-400">${row.count} occurrence${row.count === 1 ? "" : "s"}</span>
+                  </button>
+                `).join("") : `<p>No numeric-heavy patterns called out.</p>`}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getMeta(path) {
+      return state.analysis ? state.analysis.nodeMap.get(path) : null;
+    }
+
+    function renderBreadcrumbs() {
+      if (!state.analysis || !state.selectedPath || !getMeta(state.selectedPath)) {
+        elements.selectedBreadcrumbs.classList.add("hidden");
+        elements.selectedBreadcrumbs.innerHTML = "";
+        return;
+      }
+      const parts = [];
+      let current = state.selectedPath;
+      while (current) {
+        const meta = getMeta(current);
+        if (!meta) break;
+        parts.unshift({ path: current, label: current === "$" ? "root" : meta.parentType === "array" ? `[${meta.key}]` : meta.key });
+        current = meta.parentPath;
+      }
+      elements.selectedBreadcrumbs.classList.remove("hidden");
+      elements.selectedBreadcrumbs.innerHTML = parts.map((item) => `
+        <button class="rounded-full border border-slate-300/60 px-3 py-1 text-xs transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-jump-path="${escapeHtml(item.path)}">${escapeHtml(item.label)}</button>
+      `).join('<span class="self-center text-xs text-slate-400">/</span>');
+    }
+
+    function renderInspector() {
+      if (!state.analysis || !state.selectedPath || !getMeta(state.selectedPath)) {
+        elements.inspectorPanel.classList.add("hidden");
+        elements.inspectorPanel.innerHTML = "";
+        return;
+      }
+      const meta = getMeta(state.selectedPath);
+      const value = meta.value;
+      const type = meta.type;
+      const parentMeta = meta.parentPath ? getMeta(meta.parentPath) : null;
+      const detectorBadges = meta.detections.length
+        ? meta.detections.map((item) => `<span class="badge bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">${escapeHtml(item)}</span>`).join("")
+        : `<span class="text-xs text-slate-500 dark:text-slate-400">No special pattern detected.</span>`;
+      const rawValue = type === "object" || type === "array" ? safeJsonString(value, 2) : JSON.stringify(value);
+      let embeddedAction = "";
+      if (type === "string") {
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed && typeof parsed === "object") {
+            embeddedAction = `<button id="openEmbeddedBtn" class="rounded-xl border border-blue-300/50 bg-blue-500/10 px-3 py-2 text-sm text-blue-700 transition hover:bg-blue-500/15 dark:border-blue-500/30 dark:text-blue-300">Parse embedded JSON</button>`;
+            state.embeddedJsonPreview = safeJsonString(parsed, 2);
+          } else {
+            state.embeddedJsonPreview = "";
+          }
+        } catch {
+          state.embeddedJsonPreview = "";
+        }
+      } else {
+        state.embeddedJsonPreview = "";
+      }
+
+      elements.inspectorPanel.classList.remove("hidden");
+      elements.inspectorPanel.innerHTML = `
+        <div class="space-y-4">
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold">Node inspector</h3>
+              <button id="pinSelectedBtn" class="rounded-xl border border-slate-300/60 px-3 py-2 text-xs transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900">${state.pinnedPaths.includes(meta.path) ? "Unpin path" : "Pin path"}</button>
+            </div>
+            <p class="mt-1 font-mono text-xs text-blue-600 dark:text-blue-300">${escapeHtml(meta.path)}</p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">${detectorBadges}</div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</p>
+              <p class="mt-1 font-semibold">${escapeHtml(type)}</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Depth</p>
+              <p class="mt-1 font-semibold">${meta.depth}</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Parent type</p>
+              <p class="mt-1 font-semibold">${escapeHtml(parentMeta ? parentMeta.type : "none")}</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Children / siblings</p>
+              <p class="mt-1 font-semibold">${meta.childCount} / ${meta.siblingCount}</p>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+            <div class="mb-2 flex flex-wrap gap-2">
+              <button class="rounded-xl border border-slate-300/60 px-3 py-2 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-copy-path="${escapeHtml(meta.path)}">Copy path</button>
+              <button class="rounded-xl border border-slate-300/60 px-3 py-2 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-copy-value="${escapeHtml(meta.path)}">Copy raw value</button>
+              <button class="rounded-xl border border-slate-300/60 px-3 py-2 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-copy-subtree="${escapeHtml(meta.path)}">Copy subtree</button>
+              ${parentMeta ? `<button class="rounded-xl border border-slate-300/60 px-3 py-2 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-900" data-jump-path="${escapeHtml(parentMeta.path)}">Jump to parent</button>` : ""}
+              ${embeddedAction}
+            </div>
+            <pre class="code-block max-h-[280px] overflow-auto rounded-2xl bg-slate-900/90 p-3 text-xs text-slate-100">${escapeHtml(rawValue)}</pre>
+            ${type === "string" ? `<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">String length: ${value.length}</p>` : ""}
+            ${type === "number" ? `<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Numeric value: ${value}</p>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTabContent() {
+      if (state.tab === "tree") return renderTreeView();
+      if (state.tab === "pretty") return renderCodeView(prettifiedString(), "No prettified JSON yet");
+      if (state.tab === "minified") return renderCodeView(minifiedString(), "No minified JSON yet");
+      if (state.tab === "schema") return renderSchemaView();
+      return renderInsightsView();
+    }
+
+    function renderTabs() {
+      document.querySelectorAll(".tab-btn").forEach((button) => {
+        const active = button.dataset.tab === state.tab;
+        button.className = active
+          ? "tab-btn rounded-full bg-blue-500 px-3 py-1.5 text-sm font-semibold text-white"
+          : "tab-btn rounded-full border border-slate-300/60 px-3 py-1.5 text-sm dark:border-slate-700";
+      });
+      elements.tabContent.innerHTML = renderTabContent();
+    }
+
+    function render() {
+      updateInputMeta();
+      renderQuickStats();
+      renderTabs();
+      renderInspector();
+      renderBreadcrumbs();
+      renderPinnedPaths();
+      renderRecentCopies();
+      elements.autoParseToggle.checked = state.autoParse;
+      elements.sortKeysToggle.checked = state.sortKeys;
+      elements.lineNumbersToggle.checked = state.lineNumbers;
+      elements.wrapToggle.checked = state.wrapLines;
+      elements.searchInput.value = state.search.query;
+      elements.searchMode.value = state.search.mode;
+      elements.caseToggle.checked = state.search.caseSensitive;
+      elements.regexToggle.checked = state.search.regex;
+      elements.exactToggle.checked = state.search.exact;
+      elements.typeFilter.value = state.search.type;
+      elements.depthMin.value = state.search.depthMin;
+      elements.depthMax.value = state.search.depthMax;
+      applyLayout();
+      saveState();
+    }
+
+    function applyLayout() {
+      const ready = !!state.parsed;
+      elements.appSection.classList.toggle("hidden", !ready);
+      elements.editBtn.classList.toggle("hidden", !ready);
+
+      if (!ready) {
+        state.showEditor = true;
+        elements.editorSection.classList.remove("hidden");
+        elements.editorSection.classList.add("mx-auto", "max-w-4xl");
+        elements.mainGrid.className = "grid gap-5";
+        return;
+      }
+
+      if (state.showEditor) {
+        elements.editorSection.classList.remove("hidden");
+        elements.editorSection.classList.remove("mx-auto", "max-w-4xl");
+        elements.mainGrid.className = "grid gap-5 xl:grid-cols-12";
+        elements.editorSection.className = "w-full xl:col-span-5";
+        elements.appSection.className = "w-full xl:col-span-7";
+      } else {
+        elements.editorSection.classList.add("hidden");
+        elements.mainGrid.className = "grid gap-5 xl:grid-cols-12";
+        elements.appSection.className = "w-full xl:col-span-12";
+      }
+    }
+
+    function clearAll() {
+      state.rawInput = "";
+      state.parsed = null;
+      state.analysis = null;
+      state.error = null;
+      state.selectedPath = "$";
+      state.searchResults = [];
+      state.searchMatches = new Set();
+      state.activeSearchIndex = 0;
+      state.arrayChunks = {};
+      state.showEditor = true;
+      elements.jsonInput.value = "";
+      parseJsonInput({ silent: true });
+      showToast("Cleared editor.", "success");
+    }
+
+    function selectPath(path) {
+      if (!state.analysis || !state.analysis.nodeMap.has(path)) return;
+      state.selectedPath = path;
+      expandAncestors(path);
+      render();
+    }
+
+    function togglePath(path, deep = false) {
+      if (!state.analysis) return;
+      if (state.expandedPaths.has(path)) {
+        if (deep) collapseSubtree(path);
+        else state.expandedPaths.delete(path);
+      } else {
+        state.expandedPaths.add(path);
+        if (deep) expandSubtree(path);
+      }
+      render();
+    }
+
+    function expandSubtree(path) {
+      const meta = getMeta(path);
+      if (!meta) return;
+      state.expandedPaths.add(path);
+      meta.children.forEach((child) => expandSubtree(child.path));
+    }
+
+    function collapseSubtree(path) {
+      const meta = getMeta(path);
+      if (!meta) return;
+      meta.children.forEach((child) => collapseSubtree(child.path));
+      if (path !== "$") state.expandedPaths.delete(path);
+    }
+
+    function expandToLevel(level) {
+      state.expandedPaths = new Set(["$"]);
+      if (!state.analysis) return;
+      state.analysis.nodeMap.forEach((meta, path) => {
+        if (meta.depth < level && meta.children.length) state.expandedPaths.add(path);
+      });
+      render();
+    }
+
+    function goToSearchMatch(direction) {
+      if (!state.searchResults.length) return;
+      const nextIndex = (state.activeSearchIndex + direction + state.searchResults.length) % state.searchResults.length;
+      state.activeSearchIndex = nextIndex;
+      const path = state.searchResults[nextIndex];
+      selectPath(path);
+    }
+
+    function openEmbeddedModal() {
+      if (!state.embeddedJsonPreview) return;
+      elements.embeddedContent.textContent = state.embeddedJsonPreview;
+      elements.embeddedModal.classList.remove("hidden");
+      elements.embeddedModal.classList.add("flex");
+    }
+
+    function closeEmbeddedModal() {
+      elements.embeddedModal.classList.add("hidden");
+      elements.embeddedModal.classList.remove("flex");
+    }
+
+    function handleJumpPath(path) {
+      state.tab = "tree";
+      selectPath(path);
+    }
+
+    function handleCopyByPath(path, mode) {
+      const meta = getMeta(path);
+      if (!meta) return;
+      if (mode === "path") copyToClipboard(meta.path, "Path copied.");
+      if (mode === "value") {
+        const content = meta.type === "object" || meta.type === "array" ? safeJsonString(meta.value, 2) : String(meta.value);
+        copyToClipboard(content, "Value copied.");
+      }
+      if (mode === "subtree") copyToClipboard(safeJsonString(meta.value, 2), "Subtree copied.");
+      if (mode === "key") copyToClipboard(String(meta.key ?? "root"), "Key copied.");
+    }
+
+    function updateSearchFromControls() {
+      state.search.query = elements.searchInput.value;
+      state.search.mode = elements.searchMode.value;
+      state.search.caseSensitive = elements.caseToggle.checked;
+      state.search.regex = elements.regexToggle.checked;
+      state.search.exact = elements.exactToggle.checked;
+      state.search.type = elements.typeFilter.value;
+      state.search.depthMin = elements.depthMin.value;
+      state.search.depthMax = elements.depthMax.value;
+      computeSearchResults();
+      render();
+    }
+
+    function bindEvents() {
+      const debouncedParse = debounce(() => {
+        if (state.autoParse) parseJsonInput({ silent: true });
+      }, 450);
+
+      elements.jsonInput.addEventListener("input", () => {
+        state.rawInput = elements.jsonInput.value;
+        updateInputMeta();
+        debouncedParse();
+        saveState();
+      });
+
+      elements.searchInput.addEventListener("input", debounce(updateSearchFromControls, 160));
+      ["searchMode", "caseToggle", "regexToggle", "exactToggle", "typeFilter", "depthMin", "depthMax"].forEach((id) => {
+        elements[id].addEventListener("input", updateSearchFromControls);
+        elements[id].addEventListener("change", updateSearchFromControls);
+      });
+
+      document.getElementById("validateBtn").addEventListener("click", () => parseJsonInput());
+      document.getElementById("prettifyBtn").addEventListener("click", () => {
+        if (parseJsonInput({ silent: true })) {
+          const pretty = prettifiedString();
+          state.rawInput = pretty;
+          elements.jsonInput.value = pretty;
+          state.tab = "pretty";
+          render();
+          showToast("JSON prettified.", "success");
+        }
+      });
+      document.getElementById("minifyBtn").addEventListener("click", () => {
+        if (parseJsonInput({ silent: true })) {
+          const minified = minifiedString();
+          state.rawInput = minified;
+          elements.jsonInput.value = minified;
+          state.tab = "minified";
+          render();
+          showToast("JSON minified.", "success");
+        }
+      });
+      document.getElementById("clearBtn").addEventListener("click", clearAll);
+      document.getElementById("copyInputBtn").addEventListener("click", () => copyToClipboard(state.rawInput, "Input copied."));
+      document.getElementById("copyPrettyBtn").addEventListener("click", () => {
+        if (!parseJsonInput({ silent: true })) return;
+        copyToClipboard(prettifiedString(), "Formatted JSON copied.");
+      });
+      document.getElementById("copyMinifiedBtn").addEventListener("click", () => {
+        if (!parseJsonInput({ silent: true })) return;
+        copyToClipboard(minifiedString(), "Minified JSON copied.");
+      });
+      elements.editBtn.addEventListener("click", () => {
+        if (!state.parsed) return;
+        state.showEditor = !state.showEditor;
+        render();
+        if (state.showEditor) elements.jsonInput.focus();
+      });
+      document.getElementById("themeToggle").addEventListener("click", () => {
+        state.theme = state.theme === "dark" ? "light" : "dark";
+        applyTheme();
+        render();
+      });
+      document.getElementById("collapseAllBtn").addEventListener("click", () => {
+        state.expandedPaths = new Set(["$"]);
+        render();
+      });
+      document.getElementById("expandAllBtn").addEventListener("click", () => {
+        if (!state.analysis) return;
+        state.analysis.nodeMap.forEach((meta, path) => {
+          if (meta.children.length) state.expandedPaths.add(path);
+        });
+        render();
+      });
+      document.querySelectorAll(".expand-level-btn").forEach((button) => {
+        button.addEventListener("click", () => expandToLevel(Number(button.dataset.level)));
+      });
+      document.querySelectorAll(".tab-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.tab = button.dataset.tab;
+          render();
+        });
+      });
+      elements.autoParseToggle.addEventListener("change", () => {
+        state.autoParse = elements.autoParseToggle.checked;
+        saveState();
+      });
+      elements.sortKeysToggle.addEventListener("change", () => {
+        state.sortKeys = elements.sortKeysToggle.checked;
+        render();
+      });
+      elements.lineNumbersToggle.addEventListener("change", () => {
+        state.lineNumbers = elements.lineNumbersToggle.checked;
+        render();
+      });
+      elements.wrapToggle.addEventListener("change", () => {
+        state.wrapLines = elements.wrapToggle.checked;
+        render();
+      });
+      document.getElementById("prevMatchBtn").addEventListener("click", () => goToSearchMatch(-1));
+      document.getElementById("nextMatchBtn").addEventListener("click", () => goToSearchMatch(1));
+      document.getElementById("clearPinsBtn").addEventListener("click", () => {
+        state.pinnedPaths = [];
+        render();
+      });
+      document.getElementById("clearCopiedBtn").addEventListener("click", () => {
+        state.recentCopies = [];
+        render();
+      });
+
+      elements.fileInput.addEventListener("change", async (event) => {
+        const [file] = event.target.files || [];
+        if (!file) return;
+        const text = await file.text();
+        state.rawInput = text;
+        elements.jsonInput.value = text;
+        parseJsonInput({ silent: true });
+        render();
+        showToast(`Loaded ${file.name}.`, "success");
+      });
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        elements.dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          elements.dropOverlay.classList.remove("hidden");
+          elements.dropOverlay.classList.add("flex");
+        });
+      });
+      ["dragleave", "drop"].forEach((eventName) => {
+        elements.dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          elements.dropOverlay.classList.add("hidden");
+          elements.dropOverlay.classList.remove("flex");
+        });
+      });
+      elements.dropZone.addEventListener("drop", async (event) => {
+        const file = [...(event.dataTransfer.files || [])].find((item) => item.type === "application/json" || item.name.endsWith(".json"));
+        if (!file) {
+          showToast("Drop a .json file.", "error");
+          return;
+        }
+        const text = await file.text();
+        state.rawInput = text;
+        elements.jsonInput.value = text;
+        parseJsonInput({ silent: true });
+        render();
+        showToast(`Loaded ${file.name}.`, "success");
+      });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const toggle = target.closest("[data-toggle]");
+        if (toggle) {
+          togglePath(toggle.dataset.toggle, event.altKey);
+          return;
+        }
+
+        const select = target.closest("[data-select]");
+        if (select) {
+          selectPath(select.dataset.select);
+          return;
+        }
+
+        const jump = target.closest("[data-jump-path]");
+        if (jump) {
+          handleJumpPath(jump.dataset.jumpPath);
+          return;
+        }
+
+        const copyPreview = target.closest("[data-copy-preview]");
+        if (copyPreview) {
+          copyToClipboard(copyPreview.dataset.copyPreview, "Copied recent value preview.");
+          return;
+        }
+
+        const showMore = target.closest("[data-show-more]");
+        if (showMore) {
+          const path = showMore.dataset.showMore;
+          state.arrayChunks[path] = (state.arrayChunks[path] || 50) + 50;
+          render();
+          return;
+        }
+
+        const copyPath = target.closest("[data-copy-path]");
+        if (copyPath) {
+          handleCopyByPath(copyPath.dataset.copyPath, "path");
+          return;
+        }
+
+        const copyValue = target.closest("[data-copy-value]");
+        if (copyValue) {
+          handleCopyByPath(copyValue.dataset.copyValue, "value");
+          return;
+        }
+
+        const copySubtree = target.closest("[data-copy-subtree]");
+        if (copySubtree) {
+          handleCopyByPath(copySubtree.dataset.copySubtree, "subtree");
+          return;
+        }
+
+        const copyKey = target.closest("[data-copy-key]");
+        if (copyKey) {
+          handleCopyByPath(copyKey.dataset.copyKey, "key");
+          return;
+        }
+
+        if (target.id === "pinSelectedBtn") {
+          if (!state.selectedPath) return;
+          if (state.pinnedPaths.includes(state.selectedPath)) {
+            state.pinnedPaths = state.pinnedPaths.filter((path) => path !== state.selectedPath);
+          } else {
+            state.pinnedPaths = [state.selectedPath, ...state.pinnedPaths.filter((path) => path !== state.selectedPath)].slice(0, 10);
+          }
+          render();
+          return;
+        }
+
+        if (target.id === "openEmbeddedBtn") {
+          openEmbeddedModal();
+        }
+      });
+
+      elements.copyEmbeddedBtn.addEventListener("click", () => {
+        if (state.embeddedJsonPreview) copyToClipboard(state.embeddedJsonPreview, "Embedded JSON copied.");
+      });
+      elements.closeEmbeddedBtn.addEventListener("click", closeEmbeddedModal);
+      elements.embeddedModal.addEventListener("click", (event) => {
+        if (event.target === elements.embeddedModal) closeEmbeddedModal();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        const mod = event.metaKey || event.ctrlKey;
+        if (mod && event.key === "Enter") {
+          event.preventDefault();
+          parseJsonInput();
+        }
+        if (mod && event.shiftKey && event.key.toLowerCase() === "p") {
+          event.preventDefault();
+          document.getElementById("prettifyBtn").click();
+        }
+        if (mod && event.shiftKey && event.key.toLowerCase() === "m") {
+          event.preventDefault();
+          document.getElementById("minifyBtn").click();
+        }
+        if (mod && event.key.toLowerCase() === "f") {
+          event.preventDefault();
+          elements.searchInput.focus();
+          elements.searchInput.select();
+        }
+        if (event.key === "Escape") {
+          if (!elements.embeddedModal.classList.contains("hidden")) {
+            closeEmbeddedModal();
+            return;
+          }
+          state.search.query = "";
+          elements.searchInput.value = "";
+          computeSearchResults();
+          render();
+        }
+      });
+    }
+
+    function init() {
+      cacheElements();
+      loadPersistedState();
+      applyTheme();
+      elements.jsonInput.value = state.rawInput;
+      bindEvents();
+      render();
+      if (state.rawInput.trim()) {
+        parseJsonInput({ silent: true });
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
